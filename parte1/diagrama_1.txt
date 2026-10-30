@@ -1,0 +1,83 @@
+@startuml
+!theme amiga
+autonumber
+skinparam style strictuml
+
+actor       "Usuário"               as U
+boundary    "TelaRenovacao"         as TR
+control     "RenovacaoController"   as RC
+entity      "Emprestimo"            as E
+entity      "Livro"                 as L
+boundary    "APIPagamentoPix"       as PIX
+
+U -> TR : solicitaRenovacaoEmprestimo()
+activate TR
+TR -> RC : processarRenovacao()
+activate RC
+
+RC -> E : obterLivro()
+activate E
+E --> RC : livro
+deactivate E
+
+RC -> L : verificaDisponibilidade()
+activate L
+L --> RC : possuiReserva (boolean)
+deactivate L
+
+alt Livro possui reserva
+    RC --> TR : notificarImpedimento("Livro possui reserva")
+    TR --> U : "Possui Reserva - Renovação Cancelada"
+
+else Livro sem reserva
+    RC -> E : verificaPrazo()
+    activate E
+    E --> RC : estaAtrasado (boolean)
+    deactivate E
+    
+    alt Empréstimo em atraso
+        RC --> TR : notificarAtraso(valorMulta)
+        TR --> U : "Atraso detectado. Devolva o livro ou pague a multa para renovar."
+        
+        alt Usuário opta por pagar multa via Pix
+            U -> TR : escolherPagamentoPix()
+            TR -> RC : solicitarPix(valorMulta)
+            RC -> PIX : gerarCodigoPix(valorMulta)
+            activate PIX
+            PIX --> RC : codigoPix
+            deactivate PIX
+            
+            RC --> TR : exibirCodigoPix(codigoPix)
+            TR --> U : exibeQRCodeEPix(codigoPix)
+            
+            U -> TR : confirmarPagamento()
+            TR -> RC : validarPagamento()
+            RC -> PIX : checarStatusPagamento()
+            activate PIX
+            PIX --> RC : pagamentoConfirmado
+            deactivate PIX
+            
+            RC -> E : renovarEmprestimo()
+            activate E
+            E --> RC : novaDataDevolucao
+            deactivate E
+            RC --> TR : confirmarRenovacao(novaDataDevolucao)
+            TR --> U : "Multa quitada! Empréstimo renovado com sucesso."
+            
+        else Usuário não paga a multa
+            TR --> U : "Renovação Não Permitida. Realize a devolução do exemplar."
+        end
+        
+    else Empréstimo em dia
+        RC -> E : renovarEmprestimo()
+        activate E
+        E --> RC : novaDataDevolucao
+        deactivate E
+        RC --> TR : confirmarRenovacao(novaDataDevolucao)
+        TR --> U : "Empréstimo renovado com sucesso!"
+    end
+end
+
+deactivate RC
+deactivate TR
+@enduml
