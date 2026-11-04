@@ -1,0 +1,59 @@
+@startuml
+skinparam style strictuml
+skinparam nodesep 80
+skinparam ranksep 50
+skinparam wrapWidth 350
+title Diagrama de Estados - Exemplar (Ciclo de vida do exemplar)
+ 
+state "Disponível" as Disponivel
+state "Reservado" as Reservado
+state "Emprestado" as Emprestado
+state "Atrasado" as Atrasado
+state "Em Inspeção" as EmInspecao
+state Devolucao <<choice>>
+state PosInspecao <<choice>>
+ 
+' Reserva com o exemplar em circulação ou em inspeção
+' (transição interna: o estado não muda)
+Emprestado : registrarReserva() / possuiReserva = true
+Atrasado : registrarReserva() / possuiReserva = true
+EmInspecao : registrarReserva() / possuiReserva = true
+ 
+' ---------- Estado inicial ----------
+[*] -down-> Disponivel : cadastrarExemplar()
+ 
+' ---------- Disponível <-> Reservado ----------
+Disponivel -left---> Reservado : registrarReserva()
+Reservado -right---> Disponivel : cancelarReserva() ou\nreservaExpirada()
+ 
+' ---------- Empréstimo ----------
+Disponivel -down-> Emprestado : realizarEmprestimo()
+Reservado -down-> Emprestado : retirarExemplarReservado()
+ 
+' ---------- Atraso ----------
+Emprestado -down-> Atrasado : prazoDeDevolucaoVencido()
+Atrasado -right-> Atrasado : a cada 24h /\nenviarEmailAtraso()
+ 
+' ---------- Devolução (losango abaixo de Atrasado) ----------
+Emprestado -right-> Devolucao : devolverExemplar()
+Atrasado -down-> Devolucao : devolverExemplar()
+ 
+' ---------- Inspeção a cada 15 empréstimos ----------
+Devolucao -right-> EmInspecao : [contadorEmprestimos % 15 == 0]
+Devolucao -up-> PosInspecao : [contadorEmprestimos % 15 != 0]
+EmInspecao -up-> PosInspecao : concluirInspecao()
+ 
+' ---------- Destino final ----------
+PosInspecao -left-> Reservado : [possuiReserva]
+PosInspecao -down-> Disponivel : [!possuiReserva]
+ 
+' ---------- Nota única ----------
+note bottom of Atrasado
+  *Atributos:* contadorEmprestimos (acumulado) e possuiReserva
+  *Cadastro:* contadorEmprestimos = 0; possuiReserva = false
+  *Empréstimo* ou *retirada:* contadorEmprestimos++
+  *registrarReserva():* possuiReserva = true
+  *Cancelar, expirar* ou *retirar reserva:* possuiReserva = false
+  *Contador múltiplo de 15:* vai para inspeção
+end note
+@enduml
